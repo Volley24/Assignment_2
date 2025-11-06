@@ -5,7 +5,10 @@
  *
  */
 
-#include<interrupts.hpp>
+#include <interrupts.hpp>
+#include <string.h>
+
+using namespace std;
 
 std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string> trace_file, int time, std::vector<std::string> vectors, std::vector<int> delays, std::vector<external_file> external_files, PCB current, std::vector<PCB> wait_queue) {
 
@@ -13,6 +16,19 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
     std::string execution = "";  //!< string to accumulate the execution output
     std::string system_status = "";  //!< string to accumulate the system status output
     int current_time = time;
+
+	// Utility function to avoid having to manually add a line to the execution and set the time
+    // This appends the current timestamp, duration of the operation, and output to the execution string and it increments the global duration time
+	auto print = [&](string output, int duration) {
+		execution += std::to_string(current_time) + ", " + std::to_string(duration) + ", " + output + "\n";
+		current_time += duration;
+		cout << "add " << duration << endl;
+	};
+
+	auto printSystemStatus = [&]() {
+		system_status += "Time: " + to_string(current_time) + "; Current Trace: " + trace + "\n";
+		system_status += print_PCB(current, wait_queue) + "\n";
+	};
 
     //parse each line of the input trace file. 'for' loop to keep track of indices.
     for(size_t i = 0; i < trace_file.size(); i++) {
@@ -51,12 +67,12 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
             ///////////////////////////////////////////////////////////////////////////////////////////
             //Add your FORK output here
 
-
+			printSystemStatus();
 
             ///////////////////////////////////////////////////////////////////////////////////////////
 
             //The following loop helps you do 2 things:
-            // * Collect the trace of the chile (and only the child, skip parent)
+            // * Collect the trace of the child (and only the child, skip parent)
             // * Get the index of where the parent is supposed to start executing from
             std::vector<std::string> child_trace;
             bool skip = true;
@@ -92,7 +108,42 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
             ///////////////////////////////////////////////////////////////////////////////////////////
             //With the child's trace, run the child (HINT: think recursion)
 
+			// probably just call simulate_trace 
+			// with the child's trace (code above does that for us)
+			// copied PCB
+			// time, vectors, and a bunch of other stuff.
 
+			/*
+				std::vector<std::string> trace_file = child_trace
+				int time = currentTime
+				std::vector<std::string> vectors = ???
+				std::vector<int> delays = ???
+				std::vector<external_file> external_files = ???
+				PCB current = clone(parent_PCB)
+				std::vector<PCB> wait_queue = ???
+	
+			*/
+
+			// clone the PCB
+
+			print("cloning the PCB", duration_intr);
+
+			// PID, PPID, programName, size, partition_number
+
+			// Clone the PCB
+    		PCB cloned_PCB(1, 2, program_name, 1, -1);
+			allocate_memory(&cloned_PCB);
+
+			print("scheduler called", 0);
+
+			print("IERT", 1);
+
+
+			// TODO: Need to fix wait_queue, since it now has nothing.
+			auto [child_execution, child_system_status, child_time] = simulate_trace(child_trace, current_time, vectors, delays, external_files, cloned_PCB, wait_queue);
+			execution += child_execution;			
+			current_time = child_time;
+			system_status += child_system_status;
 
             ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -105,7 +156,7 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
             ///////////////////////////////////////////////////////////////////////////////////////////
             //Add your EXEC output here
 
-
+			printSystemStatus();
 
             ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -118,14 +169,42 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
                 exec_traces.push_back(exec_trace);
             }
 
+
             ///////////////////////////////////////////////////////////////////////////////////////////
             //With the exec's trace (i.e. trace of external program), run the exec (HINT: think recursion)
 
+			// find corresponding external_file
+			// in order to find file.size
+			external_file file;
+			for (external_file external_file : external_files) {
+				if (external_file.program_name == program_name) {
+					file = external_file;
+				}
+			}
 
+			print("Program '" + program_name +  "' is " + to_string(file.size) + " MB large", duration_intr);
+
+			print("loading program into memory", file.size * 15);
+			print("marking partition as occupied", 3);
+			print("updating PCB", 6);
+
+			print("scheduler called", 0);
+			print("IERT", 1);
+
+			// New PCB for EXEC'd program
+			PCB new_pcb(1, 2, program_name, 1, -1);
+			allocate_memory(&new_pcb);
+
+			// TODO: Need to fix wait_queue, since it now has nothing.
+			auto [exec_execution, exec_system_status, exec_time] =  simulate_trace(exec_traces, current_time, vectors, delays, external_files, new_pcb, wait_queue);
+			execution += exec_execution;			
+			current_time = exec_time;
+			system_status += exec_system_status;
 
             ///////////////////////////////////////////////////////////////////////////////////////////
 
             break; //Why is this important? (answer in report)
+			// well, beacuse we don't want to execute next steps. We are SWAPPING PCB / TEXT for the EXEC program.
 
         }
     }
@@ -149,6 +228,8 @@ int main(int argc, char** argv) {
     //Make initial PCB (notice how partition is not assigned yet)
     PCB current(0, -1, "init", 1, -1);
     //Update memory (partition is assigned here, you must implement this function)
+
+	// TODO - Not sure what is meant by needing to implement this function, it is given in interrupts.hpp
     if(!allocate_memory(&current)) {
         std::cerr << "ERROR! Memory allocation failed!" << std::endl;
     }
