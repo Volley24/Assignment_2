@@ -1,0 +1,2 @@
+EXEC bigprogram, 10
+CPU, 100

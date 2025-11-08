@@ -1,5 +1,5 @@
 FORK, 15
 IF_CHILD, 0
 IF_PARENT, 0
-ENDIF, 0 //notice how nothing is happening in the conditionals
-EXEC program2, 33 //which process executes this? Why
+ENDIF, 0
+EXEC program2, 33

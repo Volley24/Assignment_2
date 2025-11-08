@@ -1,0 +1,9 @@
+0, 1, switch to kernel mode
+1, 10, context saved
+11, 1, find vector 3 in memory position 0x0006
+12, 1, load address 0X042B into the PC
+13, 10, Program 'bigprogram' is 60 MB large
+23, 900, loading program into memory
+923, 3, marking partition as occupied
+926, 0, ERROR: Could not allocate memory partition for program 'bigprogram' with size 60MB. Aborting EXEC instruction...
+926, 100, CPU Burst
