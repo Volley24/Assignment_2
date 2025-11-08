@@ -3,14 +3,16 @@
  * @file interrupts.cpp
  * @author Sasisekhar Govind
  *
+ * @author Maxim Creanga 101298069
  */
 
 #include <interrupts.hpp>
 #include <string.h>
+#include <algorithm> // Needed to delete a PCB from a vector, to clear the wait queue
 
 using namespace std;
 
-std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string> trace_file, int time, std::vector<std::string> vectors, std::vector<int> delays, std::vector<external_file> external_files, PCB current, std::vector<PCB> wait_queue) {
+std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string> trace_file, int time, std::vector<std::string> vectors, std::vector<int> delays, std::vector<external_file> external_files, PCB current, std::vector<PCB> &wait_queue) {
 
     std::string trace;      //!< string to store single line of trace file
     std::string execution = "";  //!< string to accumulate the execution output
@@ -22,12 +24,13 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
 	auto print = [&](string output, int duration) {
 		execution += std::to_string(current_time) + ", " + std::to_string(duration) + ", " + output + "\n";
 		current_time += duration;
-		cout << "add " << duration << endl;
 	};
 
-	auto printSystemStatus = [&]() {
+
+    // Utility function to print out the current PCB and PCB wait queue to the system status
+	auto printSystemStatus = [&](PCB &pcb, std::string &trace) {
 		system_status += "Time: " + to_string(current_time) + "; Current Trace: " + trace + "\n";
-		system_status += print_PCB(current, wait_queue) + "\n";
+		system_status += print_PCB(pcb, wait_queue) + "\n";
 	};
 
     //parse each line of the input trace file. 'for' loop to keep track of indices.
@@ -67,7 +70,19 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
             ///////////////////////////////////////////////////////////////////////////////////////////
             //Add your FORK output here
 
-			printSystemStatus();
+            print("cloning the PCB", duration_intr);
+            // Clone the PCB:
+            // Make the PID + 1
+            // The Parent PID should the be the current PID
+            // The partition number is -1 as it will be allocated by the allocate_memory function
+    		PCB cloned_PCB(current.PID + 1, current.PID, current.program_name, current.size, -1);
+            if (!allocate_memory(&cloned_PCB)) {
+                print("ERROR: Could not allocate memory partition for current program '" + current.program_name + "' with size " + to_string(current.size) + "MB. Aborting FORK instruction...", 0);
+                continue;
+            }
+
+            print("scheduler called", 0);
+			print("IERT", 1);
 
             ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -108,45 +123,24 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
             ///////////////////////////////////////////////////////////////////////////////////////////
             //With the child's trace, run the child (HINT: think recursion)
 
-			// probably just call simulate_trace 
-			// with the child's trace (code above does that for us)
-			// copied PCB
-			// time, vectors, and a bunch of other stuff.
 
-			/*
-				std::vector<std::string> trace_file = child_trace
-				int time = currentTime
-				std::vector<std::string> vectors = ???
-				std::vector<int> delays = ???
-				std::vector<external_file> external_files = ???
-				PCB current = clone(parent_PCB)
-				std::vector<PCB> wait_queue = ???
-	
-			*/
+            // Add parent to the WAIT queue, as the CHILD has priority over the parent.
+            wait_queue.push_back(current);
 
-			// clone the PCB
+            printSystemStatus(cloned_PCB, trace);
 
-			print("cloning the PCB", duration_intr);
+            // Recursively call simulate_trace with the forked pcb.
+            // The child will run first, running only the child trace,
+            // And after it is done, the parent will execute as well.
+            auto [child_execution, child_system_status, child_time] = simulate_trace(child_trace, current_time, vectors, delays, external_files, cloned_PCB, wait_queue);
+            execution += child_execution;            
+            current_time = child_time;
+            system_status += child_system_status;
 
-			// PID, PPID, programName, size, partition_number
-
-			// Clone the PCB
-    		PCB cloned_PCB(1, 2, program_name, 1, -1);
-			allocate_memory(&cloned_PCB);
-
-			print("scheduler called", 0);
-
-			print("IERT", 1);
-
-
-			// TODO: Need to fix wait_queue, since it now has nothing.
-			auto [child_execution, child_system_status, child_time] = simulate_trace(child_trace, current_time, vectors, delays, external_files, cloned_PCB, wait_queue);
-			execution += child_execution;			
-			current_time = child_time;
-			system_status += child_system_status;
+            // Free memory for child PCB after it finishes runing
+            free_memory(&cloned_PCB);
 
             ///////////////////////////////////////////////////////////////////////////////////////////
-
 
         } else if(activity == "EXEC") {
             auto [intr, time] = intr_boilerplate(current_time, 3, 10, vectors);
@@ -156,7 +150,31 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
             ///////////////////////////////////////////////////////////////////////////////////////////
             //Add your EXEC output here
 
-			printSystemStatus();
+            // Find the corresponding external file 
+			// In order to determine the EXEC file.size
+			external_file file;
+			for (external_file external_file : external_files) {
+				if (external_file.program_name == program_name) {
+					file = external_file;
+				}
+			}
+
+            print("Program '" + program_name +  "' is " + to_string(file.size) + " MB large", duration_intr);
+            // The time is calculated as follows: Size of Program in MB * 15ms/MB
+			print("loading program into memory", file.size * 15);
+            
+
+            print("marking partition as occupied", 3);
+            PCB new_pcb(current.PID, -1, program_name, file.size, -1);
+			if (!allocate_memory(&new_pcb)) {
+                print("ERROR: Could not allocate memory partition for program '" + program_name + "' with size " + to_string(file.size) + "MB. Aborting EXEC instruction...", 0);
+                continue;
+            }
+            
+			print("updating PCB", 6);
+
+            print("scheduler called", 0);
+			print("IERT", 1);
 
             ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -173,42 +191,37 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
             ///////////////////////////////////////////////////////////////////////////////////////////
             //With the exec's trace (i.e. trace of external program), run the exec (HINT: think recursion)
 
-			// find corresponding external_file
-			// in order to find file.size
-			external_file file;
-			for (external_file external_file : external_files) {
-				if (external_file.program_name == program_name) {
-					file = external_file;
-				}
-			}
+            // Remove parent PCB from wait queue
+            auto pcb = wait_queue.begin();
+            while (pcb != wait_queue.end()) {
+                if (pcb->PID == current.PID) {
+                    pcb = wait_queue.erase(pcb);
+                } else {
+                    pcb ++;
+                }
+            }
 
-			print("Program '" + program_name +  "' is " + to_string(file.size) + " MB large", duration_intr);
+            // Print the PCB + queue to the system status
+            printSystemStatus(new_pcb, trace);
 
-			print("loading program into memory", file.size * 15);
-			print("marking partition as occupied", 3);
-			print("updating PCB", 6);
-
-			print("scheduler called", 0);
-			print("IERT", 1);
-
-			// New PCB for EXEC'd program
-			PCB new_pcb(1, 2, program_name, 1, -1);
-			allocate_memory(&new_pcb);
-
-			// TODO: Need to fix wait_queue, since it now has nothing.
-			auto [exec_execution, exec_system_status, exec_time] =  simulate_trace(exec_traces, current_time, vectors, delays, external_files, new_pcb, wait_queue);
-			execution += exec_execution;			
-			current_time = exec_time;
-			system_status += exec_system_status;
+            // Recursively call simulate_trace with the new pcb
+            auto [exec_execution, exec_system_status, exec_time] =  simulate_trace(exec_traces, current_time, vectors, delays, external_files, new_pcb, wait_queue);
+            execution += exec_execution;            
+            current_time = exec_time;
+            system_status += exec_system_status;
+            // Free memory for exec PCB after it finishes
+            free_memory(&new_pcb);
 
             ///////////////////////////////////////////////////////////////////////////////////////////
 
+            // Break so that the 'old' code doesn't get to run anymore
+            // As EXEC replaces the code.
             break; //Why is this important? (answer in report)
-			// well, beacuse we don't want to execute next steps. We are SWAPPING PCB / TEXT for the EXEC program.
-
         }
     }
 
+    // Free memory for current PCB after finishing its trace
+    free_memory(&current);
     return {execution, system_status, current_time};
 }
 
@@ -228,8 +241,6 @@ int main(int argc, char** argv) {
     //Make initial PCB (notice how partition is not assigned yet)
     PCB current(0, -1, "init", 1, -1);
     //Update memory (partition is assigned here, you must implement this function)
-
-	// TODO - Not sure what is meant by needing to implement this function, it is given in interrupts.hpp
     if(!allocate_memory(&current)) {
         std::cerr << "ERROR! Memory allocation failed!" << std::endl;
     }

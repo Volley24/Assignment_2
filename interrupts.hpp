@@ -1,16 +1,16 @@
 #ifndef INTERRUPTS_HPP_
 #define INTERRUPTS_HPP_
 
-#include<iostream>
-#include<fstream>
-#include<string>
-#include<vector>
-#include<random>
-#include<utility>
-#include<sstream>
-#include<iomanip>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <random>
+#include <utility>
+#include <sstream>
+#include <iomanip>
 #include <algorithm>
-#include<stdio.h>
+#include <stdio.h>
 
 #define ADDR_BASE   0
 #define VECTOR_SIZE 2
@@ -252,6 +252,10 @@ void print_external_files(std::vector<external_file> files) {
     // Print bottom border
     std::cout << "+" << std::setfill('-') << std::setw(tableWidth) << "+" << std::endl;
 }
+
+// child (parent)
+
+/**/
 
 //This function takes as input: the current PCB and the waitqueue (which is a
 //std::vector of the PCB struct); the function returns the information as a table

@@ -1,0 +1,42 @@
+Time: 31; Current Trace: FORK, 17
++------------------------------------------------------+
+| PID |program name |partition number | size |   state |
++------------------------------------------------------+
+|   1 |        init |               5 |    1 | running |
+|   0 |        init |               6 |    1 | waiting |
++------------------------------------------------------+
+
+Time: 220; Current Trace: EXEC program1, 16
++------------------------------------------------------+
+| PID |program name |partition number | size |   state |
++------------------------------------------------------+
+|   1 |    program1 |               4 |   10 | running |
+|   0 |        init |               6 |    1 | waiting |
++------------------------------------------------------+
+
+Time: 249; Current Trace: FORK, 15
++------------------------------------------------------+
+| PID |program name |partition number | size |   state |
++------------------------------------------------------+
+|   2 |    program1 |               3 |   10 | running |
+|   0 |        init |               6 |    1 | waiting |
+|   1 |    program1 |               4 |   10 | waiting |
++------------------------------------------------------+
+
+Time: 530; Current Trace: EXEC program2, 33 //which process executes this? Why
++------------------------------------------------------+
+| PID |program name |partition number | size |   state |
++------------------------------------------------------+
+|   2 |    program2 |               2 |   15 | running |
+|   0 |        init |               6 |    1 | waiting |
+|   1 |    program1 |               4 |   10 | waiting |
++------------------------------------------------------+
+
+Time: 864; Current Trace: EXEC program2, 33 //which process executes this? Why
++------------------------------------------------------+
+| PID |program name |partition number | size |   state |
++------------------------------------------------------+
+|   1 |    program2 |               3 |   15 | running |
+|   0 |        init |               6 |    1 | waiting |
++------------------------------------------------------+
+
