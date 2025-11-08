@@ -1,1 +1,1 @@
-CPU, 53
+SYSCALL, 4
